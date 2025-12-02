@@ -1,35 +1,55 @@
-import joblib
+# train_model.py
+
+import numpy as np
+from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, r2_score
+import joblib  # to save the trained model
 from preprocess import load_and_preprocess
-import os
 
-def train_model():
-    df = load_and_preprocess()
-    
-    # Features and target
-    X = df[['t2m_1h_ago','t2m_6h_ago','u10','v10','tp','hour']]
-    y = df['t2m']
+# Path to your GRIB file
+grib_file = "data/era5_2025_01_01.grib"
 
-    # Split train/test
-    split_idx = int(len(df) * 0.75)
-    X_train, X_test = X[:split_idx], X[split_idx:]
-    y_train, y_test = y[:split_idx], y[split_idx:]
+# Load the data (temperature as an example)
+temperature_data = load_and_preprocess(grib_file, param_id=130, variable_name='Month')
 
-    # Train model
-    model = RandomForestRegressor(n_estimators=50, random_state=42)
-    model.fit(X_train, y_train)
+if temperature_data is None:
+    print("Data loading failed. Exiting.")
+    exit()
 
-    # Evaluate
-    y_pred = model.predict(X_test)
-    mse = mean_squared_error(y_test, y_pred)
-    print(f"MSE: {mse:.2f}")
+# -------------------------------
+# Prepare the data for ML training
+# -------------------------------
 
-    # Save model
-    if not os.path.exists("../models"):
-        os.makedirs("../models")
-    joblib.dump(model, "../models/era5_temp_model.pkl")
-    print("Model saved to ../models/era5_temp_model.pkl")
+# Flatten the 2D/3D data to 1D features (depends on your dataset shape)
+X = np.arange(temperature_data.size).reshape(-1, 1)  # example: using indices as feature
+y = temperature_data.flatten()  # target values
 
-if __name__ == "__main__":
-    train_model()
+# Split into train and test sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# -------------------------------
+# Train a Random Forest Regressor
+# -------------------------------
+
+model = RandomForestRegressor(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+
+# -------------------------------
+# Evaluate the model
+# -------------------------------
+
+y_pred = model.predict(X_test)
+mse = mean_squared_error(y_test, y_pred)
+r2 = r2_score(y_test, y_pred)
+
+print(f"Mean Squared Error: {mse:.4f}")
+print(f"R^2 Score: {r2:.4f}")
+
+# -------------------------------
+# Save the trained model
+# -------------------------------
+
+model_file = "temperature_model.pkl"
+joblib.dump(model, model_file)
+print(f"Model saved to {model_file}")
