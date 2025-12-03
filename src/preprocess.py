@@ -12,7 +12,7 @@ def load_and_preprocess(grib_file, param_id=130):
         param_id (int): Parameter ID (130 = temperature)
 
     Returns:
-        xarray.DataArray: Extracted variable array
+        xarray.DataArray or None: Extracted variable array, or None if error
     """
     try:
         ds = xr.open_dataset(
@@ -31,8 +31,8 @@ def load_and_preprocess(grib_file, param_id=130):
         print("Using variable:", variable_name)
 
         variable_data = ds[variable_name]
-
+        return variable_data
 
     except Exception as e:
         print("Error loading GRIB:", e)
-    
+        return None
