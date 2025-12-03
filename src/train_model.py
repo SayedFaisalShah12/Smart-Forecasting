@@ -4,52 +4,58 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score
-import joblib  # to save the trained model
+import joblib
+
 from preprocess import load_and_preprocess
 
 # Path to your GRIB file
 grib_file = "data/era5_2025_01_01.grib"
 
-# Load the data (temperature as an example)
-temperature_data = load_and_preprocess(grib_file, param_id=130, variable_name='Month')
+# Load only the required variable (e.g., temperature)
+temperature_data = load_and_preprocess(grib_file, param_id=130)
 
 if temperature_data is None:
     print("Data loading failed. Exiting.")
     exit()
 
 # -------------------------------
-# Prepare the data for ML training
+# Convert xarray → numpy
 # -------------------------------
 
-# Flatten the 2D/3D data to 1D features (depends on your dataset shape)
-X = np.arange(temperature_data.size).reshape(-1, 1)  # example: using indices as feature
-y = temperature_data.flatten()  # target values
+y = temperature_data.values.flatten()     # target values
+X = np.arange(len(y)).reshape(-1, 1)      # use indices as features
 
-# Split into train and test sets
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+print("X shape:", X.shape)
+print("y shape:", y.shape)
 
 # -------------------------------
-# Train a Random Forest Regressor
+# Train/Test Split
 # -------------------------------
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
 
+# -------------------------------
+# Train Random Forest
+# -------------------------------
 model = RandomForestRegressor(n_estimators=100, random_state=42)
 model.fit(X_train, y_train)
 
 # -------------------------------
-# Evaluate the model
+# Evaluate
 # -------------------------------
-
 y_pred = model.predict(X_test)
+
 mse = mean_squared_error(y_test, y_pred)
 r2 = r2_score(y_test, y_pred)
 
 print(f"Mean Squared Error: {mse:.4f}")
-print(f"R^2 Score: {r2:.4f}")
+print(f"R² Score: {r2:.4f}")
 
 # -------------------------------
-# Save the trained model
+# Save Model
 # -------------------------------
-
 model_file = "temperature_model.pkl"
 joblib.dump(model, model_file)
-print(f"Model saved to {model_file}")
+
+print(f"Model saved as {model_file}")

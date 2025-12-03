@@ -1,26 +1,38 @@
+# preprocess.py
+
 import cfgrib
 import xarray as xr
-import numpy as np
-
-# Path to your GRIB file
-grib_file = "data/era5_2025_01_01.grib"
-
-# Open GRIB file using cfgrib
-# Use 'filter_by_keys' to select only the variable you need to avoid conflicts
 
 def load_and_preprocess(grib_file, param_id=130):
+    """
+    Load and preprocess ERA5 GRIB file using cfgrib.
+
+    Args:
+        grib_file (str): Path to the GRIB file.
+        param_id (int): Parameter ID (130 = temperature)
+
+    Returns:
+        xarray.DataArray: Extracted variable array
+    """
     try:
         ds = xr.open_dataset(
             grib_file,
             engine="cfgrib",
             backend_kwargs={
-                "filter_by_keys": {"paramId": 130},  # Example: select temperature
+                "filter_by_keys": {"paramId": param_id},
             },
         )
-        print(ds)
-        return ds
-    
-    except cfgrib.dataset.DatasetBuildError as e:
-        print("Dataset build error:", e)
-        return None
 
+        print("GRIB file loaded successfully")
+        print("Available variables:", list(ds.data_vars))
+
+        # Automatically pick the first variable
+        variable_name = list(ds.data_vars.keys())[0]
+        print("Using variable:", variable_name)
+
+        variable_data = ds[variable_name]
+
+
+    except Exception as e:
+        print("Error loading GRIB:", e)
+    
