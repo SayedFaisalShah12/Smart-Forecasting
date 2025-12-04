@@ -1,48 +1,29 @@
+# preprocess.py
+
+import cfgrib
 import xarray as xr
-import os
 
-def load_selected_variables(grib_file, selected_vars=None):
-    if not os.path.exists(grib_file):
-        print(f"❌ GRIB file not found: {grib_file}")
-        return {}
+def load_variable(grib_file, param_id):
+    """
+    Loads a single variable from a GRIB file based on paramId.
+    Returns an xarray DataArray.
+    """
 
-    # ERA5 paramId mapping
-    param_map = {
-        "t2m": 167,
-        "d2m": 168,
-        "u10": 165,
-        "v10": 166,
-        "msl": 151,
-        "sst": 34,
-        "sp": 134,
-        "tciw": 31,
-    }
+    try:
+        ds = xr.open_dataset(
+            grib_file,
+            engine="cfgrib",
+            backend_kwargs={
+                "filter_by_keys": {"paramId": param_id},
+                "indexpath": ""   # Avoid multiple index files
+            }
+        )
+    except Exception as e:
+        print(f"❌ Could not open GRIB for paramId={param_id}: {e}")
+        return None
 
-    loaded = {}
+    # GRIB datasets typically have only 1 main variable
+    var_name = list(ds.data_vars)[0]
+    print(f"✅ Loaded {var_name} (paramId={param_id})")
 
-    for var in selected_vars:
-        if var not in param_map:
-            print(f"⚠ Unknown variable: {var}")
-            continue
-
-        paramId = param_map[var]
-
-        try:
-            ds = xr.open_dataset(
-                grib_file,
-                engine="cfgrib",
-                backend_kwargs={
-                    "filter_by_keys": {"paramId": paramId},
-                    "read_keys": ["paramId", "shortName"],  # avoid merging
-                },
-            )
-
-            data_var = list(ds.data_vars)[0]  # extract first variable
-            loaded[var] = ds[data_var]
-
-            print(f"✅ Loaded {var} (paramId={paramId})")
-
-        except Exception as e:
-            print(f"❌ Could not load {var}: {e}")
-
-    return loaded
+    return ds[var_name]
