@@ -11,7 +11,7 @@ from preprocess import load_variable
 # --------------------------------------
 # Load GRIB variable (example: t2m)
 # --------------------------------------
-grib_file = "../data/era5_2025_01_01.grib"
+grib_file = "data/era5_2025_01_01.grib"
 param_id = 167  # t2m
 
 data = load_variable(grib_file, param_id)
@@ -76,6 +76,6 @@ print(f"R² Score: {r2:.4f}")
 # --------------------------------------
 # Save model
 # --------------------------------------
-save_path = "../models/trained_model.pkl"
+save_path = "models/trained_model.pkl"
 joblib.dump(model, save_path)
 print(f"\nModel saved to {save_path}")
