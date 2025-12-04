@@ -4,43 +4,69 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score
-import joblib  # to save the trained model
-from preprocess import load_and_preprocess
+import joblib
+from preprocess import load_selected_variables
 
 # Path to your GRIB file
 grib_file = "data/era5_2025_01_01.grib"
 
-# Load the data (temperature as an example)
-temperature_data = load_and_preprocess(grib_file, param_id=130)
+# Choose the variable you want to train on
+target_var = "t2m"  # temperature at 2m
 
-if temperature_data is None:
-    print("Data loading failed. Exiting.")
+# Load data
+data_dict = load_selected_variables(grib_file, selected_vars=[target_var])
+
+if target_var not in data_dict:
+    print(f"{target_var} not loaded. Exiting.")
     exit()
 
-# -------------------------------
-# Prepare the data for ML training
-# -------------------------------
+# Extract the DataArray
+data = data_dict[target_var]
 
-# Convert xarray.DataArray to numpy array
-y = temperature_data.values.flatten()
-
-# Create simple features: using indices as feature
-X = np.arange(len(y)).reshape(-1, 1)
-
-# Split into train and test sets
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# Handle NaNs if any
+data = data.fillna(0)
 
 # -------------------------------
-# Train a Random Forest Regressor
+# Prepare features
 # -------------------------------
+# We'll use a simple feature set: time, latitude, longitude
+time_len = len(data['time'])
+lat_len = len(data['latitude'])
+lon_len = len(data['longitude'])
 
-model = RandomForestRegressor(n_estimators=100, random_state=42)
+# Flatten data for ML
+y = data.values.flatten()
+
+# Create feature grid
+time_grid, lat_grid, lon_grid = np.meshgrid(
+    np.arange(time_len),
+    np.arange(lat_len),
+    np.arange(lon_len),
+    indexing='ij'
+)
+
+X = np.column_stack([
+    time_grid.flatten(),
+    lat_grid.flatten(),
+    lon_grid.flatten()
+])
+
+# -------------------------------
+# Train/test split
+# -------------------------------
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+# -------------------------------
+# Train the model
+# -------------------------------
+model = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
 model.fit(X_train, y_train)
 
 # -------------------------------
 # Evaluate the model
 # -------------------------------
-
 y_pred = model.predict(X_test)
 mse = mean_squared_error(y_test, y_pred)
 r2 = r2_score(y_test, y_pred)
@@ -49,9 +75,8 @@ print(f"Mean Squared Error: {mse:.4f}")
 print(f"R^2 Score: {r2:.4f}")
 
 # -------------------------------
-# Save the trained model
+# Save the model
 # -------------------------------
-
-model_file = "temperature_model.pkl"
+model_file = f"{target_var}_model.pkl"
 joblib.dump(model, model_file)
 print(f"Model saved to {model_file}")
