@@ -1,34 +1,48 @@
-import cfgrib
 import xarray as xr
+import os
 
-grib_file = "../data/era5_2025_01_01.grib"
+def load_selected_variables(grib_file, selected_vars=None):
+    if not os.path.exists(grib_file):
+        print(f"❌ GRIB file not found: {grib_file}")
+        return {}
 
-def load_selected_variables(grib_file, selected_vars):
-    dataset = {}
+    # ERA5 paramId mapping
+    param_map = {
+        "t2m": 167,
+        "d2m": 168,
+        "u10": 165,
+        "v10": 166,
+        "msl": 151,
+        "sst": 34,
+        "sp": 134,
+        "tciw": 31,
+    }
+
+    loaded = {}
+
     for var in selected_vars:
+        if var not in param_map:
+            print(f"⚠ Unknown variable: {var}")
+            continue
+
+        paramId = param_map[var]
+
         try:
-            # Open dataset filtering by shortName
             ds = xr.open_dataset(
                 grib_file,
                 engine="cfgrib",
-                backend_kwargs={"filter_by_keys": {"shortName": var}}
+                backend_kwargs={
+                    "filter_by_keys": {"paramId": paramId},
+                    "read_keys": ["paramId", "shortName"],  # avoid merging
+                },
             )
-            
-            # cfgrib sometimes stores the variable directly with its shortName
-            if var in ds.data_vars:
-                dataset[var] = ds[var]
-            else:
-                # fallback to first variable in dataset
-                variable_name = list(ds.data_vars.keys())[0]
-                dataset[var] = ds[variable_name]
 
-            print(f"✅ Loaded: {var}")
+            data_var = list(ds.data_vars)[0]  # extract first variable
+            loaded[var] = ds[data_var]
+
+            print(f"✅ Loaded {var} (paramId={paramId})")
+
         except Exception as e:
             print(f"❌ Could not load {var}: {e}")
-    return dataset
 
-
-if __name__ == "__main__":
-    selected_vars = ["t2m", "u10", "v10", "d2m", "msl", "sp"]
-    data = load_selected_variables(grib_file, selected_vars)
-    print("\nVariables loaded:", list(data.keys()))
+    return loaded

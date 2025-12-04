@@ -3,80 +3,79 @@
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
 import joblib
-from preprocess import load_selected_variables
+from preprocess import load_variable
 
-# Path to your GRIB file
+# --------------------------------------
+# Load GRIB variable (example: t2m)
+# --------------------------------------
 grib_file = "data/era5_2025_01_01.grib"
+param_id = 167  # t2m
 
-# Choose the variable you want to train on
-target_var = "t2m"  # temperature at 2m
+data = load_variable(grib_file, param_id)
 
-# Load data
-data_dict = load_selected_variables(grib_file, selected_vars=[target_var])
-
-if target_var not in data_dict:
-    print(f"{target_var} not loaded. Exiting.")
+if data is None:
+    print("❌ Variable not found. Exiting.")
     exit()
 
-# Extract the DataArray
-data = data_dict[target_var]
+print(f"Loaded variable: paramId={param_id} shape={data.values.shape}")
 
-# Handle NaNs if any
-data = data.fillna(0)
+# --------------------------------------
+# Convert data to numpy
+# --------------------------------------
+y_full = data.values.flatten()
 
-# -------------------------------
-# Prepare features
-# -------------------------------
-# We'll use a simple feature set: time, latitude, longitude
-time_len = len(data['time'])
-lat_len = len(data['latitude'])
-lon_len = len(data['longitude'])
+# --------------------------------------
+# ⚠️ DOWNSAMPLE to avoid memory errors
+# --------------------------------------
+DOWNSAMPLE_FACTOR = 50  # reduce data size
 
-# Flatten data for ML
-y = data.values.flatten()
+y = y_full[::DOWNSAMPLE_FACTOR]
+X = np.arange(len(y)).reshape(-1, 1)
 
-# Create feature grid
-time_grid, lat_grid, lon_grid = np.meshgrid(
-    np.arange(time_len),
-    np.arange(lat_len),
-    np.arange(lon_len),
-    indexing='ij'
-)
+print(f"Downsampled dataset from {len(y_full)} → {len(y)}")
 
-X = np.column_stack([
-    time_grid.flatten(),
-    lat_grid.flatten(),
-    lon_grid.flatten()
-])
-
-# -------------------------------
-# Train/test split
-# -------------------------------
+# --------------------------------------
+# Train-test split
+# --------------------------------------
 X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
 )
 
-# -------------------------------
-# Train the model
-# -------------------------------
-model = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
+# --------------------------------------
+# Choose Model (Safe on Low RAM)
+# --------------------------------------
+USE_RF = False  # switch to True if you want RandomForest
+
+if USE_RF:
+    print("Training RandomForest...")
+    model = RandomForestRegressor(
+        n_estimators=20,   # smaller
+        max_depth=10,      # smaller
+        random_state=42,
+        n_jobs=-1
+    )
+else:
+    print("Training LinearRegression (recommended)...")
+    model = LinearRegression()
+
 model.fit(X_train, y_train)
 
-# -------------------------------
-# Evaluate the model
-# -------------------------------
+# --------------------------------------
+# Evaluate
+# --------------------------------------
 y_pred = model.predict(X_test)
 mse = mean_squared_error(y_test, y_pred)
 r2 = r2_score(y_test, y_pred)
 
-print(f"Mean Squared Error: {mse:.4f}")
-print(f"R^2 Score: {r2:.4f}")
+print(f"\nMSE: {mse:.4f}")
+print(f"R² Score: {r2:.4f}")
 
-# -------------------------------
-# Save the model
-# -------------------------------
-model_file = f"{target_var}_model.pkl"
-joblib.dump(model, model_file)
-print(f"Model saved to {model_file}")
+# --------------------------------------
+# Save model
+# --------------------------------------
+save_path = "trained_model.pkl"
+joblib.dump(model, save_path)
+print(f"\nModel saved to {save_path}")
