@@ -3,21 +3,6 @@ import xarray as xr
 
 grib_file = "../data/era5_2025_01_01.grib"
 
-# This will open the file **without merging**
-try:
-    ds = xr.open_dataset(grib_file, engine="cfgrib", backend_kwargs={"indexpath": ""})
-except Exception as e:
-    print("Error loading GRIB file:", e)
-
-# Instead, use cfgrib directly to inspect messages
-import cfgrib
-
-grbs = cfgrib.open_file(grib_file)
-print("List of all shortNames and paramIds in the GRIB file:")
-for msg in grbs:
-    print(f"{msg.shortName} (paramId={msg.paramId})")
-
-
 
 def load_selected_variables(grib_file, selected_vars):
     dataset = {}
